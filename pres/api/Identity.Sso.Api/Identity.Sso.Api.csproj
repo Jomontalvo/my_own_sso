@@ -10,4 +10,11 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../../../core/Identity.Sso.Application/Identity.Sso.Application.csproj" />
+    <ProjectReference Include="../../../infra/Identity.Sso.Infrastructure/Identity.Sso.Infrastructure.csproj" />
+    <ProjectReference Include="../../../infra/Identity.Sso.Persistence/Identity.Sso.Persistence.csproj" />
+    <ProjectReference Include="../Identity.Sso.Helpers/Identity.Sso.Helpers.csproj" />
+  </ItemGroup>
+
 </Project>
