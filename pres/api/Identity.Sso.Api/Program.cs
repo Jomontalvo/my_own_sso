@@ -4,6 +4,7 @@ using Identity.Sso.Persistence;
 using Identity.Sso.Persistence.Context;
 using Identity.Sso.Persistence.Models;
 using Microsoft.AspNetCore.Identity;
+using OpenIddict.Abstractions;
 using Scalar.AspNetCore;
 using static System.Environment;
 
@@ -44,9 +45,69 @@ builder.Services.AddApplicationServices();
 builder.Services.AddPersistenceServices(config);
 
 // 3. Add identity services
-builder.Services.AddIdentity<ApplicationUser, ApplicationRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>()
-    .AddDefaultTokenProviders();
+builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
+{
+    var passwordPolicySection = config.GetSection("Identity:PasswordPolicy");
+    options.Password.RequireDigit = passwordPolicySection.GetValue<bool>("RequireDigit");
+    options.Password.RequireLowercase = passwordPolicySection.GetValue<bool>("RequireLowercase");
+    options.Password.RequireNonAlphanumeric = passwordPolicySection.GetValue<bool>("RequireNonAlphanumeric");
+    options.Password.RequireUppercase = passwordPolicySection.GetValue<bool>("RequireUppercase");
+    options.Password.RequiredLength = passwordPolicySection.GetValue<int>("RequiredLength");
+    options.Password.RequiredUniqueChars = passwordPolicySection.GetValue<int>("RequiredUniqueChars");
+})
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
+
+builder.Services.AddAuthorization();
+
+// 3. OpenIddict Core with EF Integration
+builder.Services.AddOpenIddict()
+    .AddCore(options =>
+    {
+        options.UseEntityFrameworkCore().UseDbContext<ApplicationDbContext>();
+    })
+    .AddServer(options =>
+    {
+        // Standard OIDC Endpoint routes
+        options.SetAuthorizationEndpointUris("/connect/authorize")
+                .SetTokenEndpointUris("/connect/token")
+                .SetUserInfoEndpointUris("/connect/userinfo")
+                .SetEndSessionEndpointUris("/connect/logout");
+
+        // Enabled OIDC / OAuth 2.0 Flows
+        options.AllowAuthorizationCodeFlow()
+               .RequireProofKeyForCodeExchange(); // PKCE required for security
+
+        options.AllowRefreshTokenFlow();      // Issuance and renewal with Refresh Tokens
+        options.AllowClientCredentialsFlow(); // Machine-to-Machine (M2M) communication
+
+        // Register supported Scopes
+        options.RegisterScopes(
+            OpenIddictConstants.Scopes.OpenId,
+            OpenIddictConstants.Scopes.Profile,
+            OpenIddictConstants.Scopes.Email,
+            OpenIddictConstants.Scopes.Roles,
+            OpenIddictConstants.Scopes.OfflineAccess,
+            "interop-admin" // Scope personalizado
+        );
+
+        // Development certificates (For production, replace with persistent X.509 certificates)
+        options.AddDevelopmentEncryptionCertificate()
+                .AddDevelopmentSigningCertificate();
+
+        // Integration with ASP.NET Core and enabling Passthrough
+        options.UseAspNetCore()
+                .EnableAuthorizationEndpointPassthrough()
+                .EnableTokenEndpointPassthrough()
+                .EnableUserInfoEndpointPassthrough()
+                .EnableEndSessionEndpointPassthrough();
+    })
+    .AddValidation(options =>
+    {
+        // Allow validating tokens within the same API if it exposes protected endpoints
+        options.UseLocalServer();
+        options.UseAspNetCore();
+    });
 
 builder.Services.AddOpenApi();
 
@@ -59,5 +120,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRouting();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.Run();

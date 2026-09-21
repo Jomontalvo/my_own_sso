@@ -27,14 +27,6 @@ public static class DependencyContainer
             options.UseOpenIddict();
         });
 
-        // 3. OpenIddict Core with EF Integration
-        services.AddOpenIddict()
-            .AddCore(options =>
-            {
-                options.UseEntityFrameworkCore()
-                    .UseDbContext<ApplicationDbContext>();
-            });
-
         return services;
     }
 
