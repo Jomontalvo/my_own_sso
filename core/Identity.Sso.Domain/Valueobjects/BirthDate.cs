@@ -47,4 +47,7 @@ public readonly record struct BirthDate
 
     // Implicit conversion: allows treating BirthDate as DateOnly
     public static implicit operator DateOnly(BirthDate birthDate) => birthDate.Value;
+
+    // Reconstructs from already-validated persisted data, bypassing domain validation - for EF Core value conversion only
+    internal static BirthDate FromPersistence(DateOnly value) => new(value);
 }

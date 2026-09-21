@@ -1,4 +1,5 @@
 using Identity.Sso.Domain.Entities;
+using Identity.Sso.Domain.ValueObjects;
 using Identity.Sso.Persistence.Context;
 using Identity.Sso.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -26,5 +27,10 @@ public class ApplicationUserConfig(ApplicationDbContext dbContext) : IEntityType
         builder.Property(u => u.FirstName).HasMaxLength(50);
         builder.Property(u => u.LastName).HasMaxLength(50);
         builder.Property(u => u.ImageFileUrl).IsUnicode();
+
+        builder.Property(u => u.BirthDate)
+            .HasConversion(bd => bd.Value, v => BirthDate.FromPersistence(v))
+            .HasColumnName("BirthDate")
+            .IsRequired();
     }
 }

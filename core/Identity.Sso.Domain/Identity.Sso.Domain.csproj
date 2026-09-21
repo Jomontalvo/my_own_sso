@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Identity.Sso.Persistence" />
+  </ItemGroup>
+
 </Project>

@@ -36,10 +36,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // 2. Register OpenIddict entities in EF Core model
         builder.UseOpenIddict();
 
-        // ApplicationUserConfig needs the current DbContext instance (for CurrentTenantId), so it's excluded from the assembly scan and applied manually.
+        // ApplicationUserConfig/ApplicationRoleConfig need the current DbContext instance (for CurrentTenantId), so they're excluded from the assembly scan and applied manually.
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly,
-            type => type == typeof(Configuration.ApplicationUserConfig));
+            type => type == typeof(Configuration.ApplicationUserConfig) || type == typeof(Configuration.ApplicationRoleConfig));
         builder.ApplyConfiguration(new Configuration.ApplicationUserConfig(this));
+        builder.ApplyConfiguration(new Configuration.ApplicationRoleConfig(this));
 
         DisableCascadingDelete(builder);
     }
