@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>@ViewData["Title"] - SIGOB SSO</title>
+    <style>
+        :root { color-scheme: light dark; }
+        body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; display: grid; place-items: center; min-height: 100vh; background: #f4f5f7; }
+        .card { background: #fff; padding: 2rem; border-radius: .75rem; box-shadow: 0 2px 16px rgba(0,0,0,.08); width: min(420px, 92vw); }
+        h1 { font-size: 1.25rem; margin: 0 0 1.25rem; }
+        label { display: block; font-size: .875rem; margin-bottom: .25rem; }
+        input[type=text], input[type=password] { width: 100%; padding: .55rem .65rem; margin-bottom: 1rem; border: 1px solid #ccd; border-radius: .375rem; box-sizing: border-box; }
+        button { padding: .6rem 1.1rem; border: 0; border-radius: .375rem; background: #1f4ed8; color: #fff; font-weight: 600; cursor: pointer; }
+        button.secondary { background: #6b7280; }
+        .error { color: #b91c1c; font-size: .875rem; margin-bottom: 1rem; }
+        ul { padding-left: 1.1rem; }
+        li { margin-bottom: .35rem; }
+        .muted { color: #6b7280; font-size: .8125rem; }
+    </style>
+</head>
+<body>
+    <main class="card">
+        @RenderBody()
+    </main>
+</body>
+</html>

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,13 +40,16 @@ public class BasicMediator(IServiceProvider serviceProvider) : IMediator
             // Call the Handle method and return the result
             return await (Task<TResponse>)handleMethod.Invoke(useCaseHandler, [request, cancellationToken])!;
         }
-        catch (Exception ex) when (ex is TargetInvocationException || ex is InvalidOperationException || ex is ArgumentNullException)
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
-            throw new MediatorException($"An error occurred while processing the request: {ex.Message}");
-        }
-        catch (MediatorException)
-        {
+            // Surface the real handler failure instead of the reflection wrapper.
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
             throw;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentNullException)
+        {
+            throw new MediatorException(
+                $"An error occurred while processing the request: {ex.Message}", ex);
         }
     }
 

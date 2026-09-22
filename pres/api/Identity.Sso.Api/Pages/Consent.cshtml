@@ -1,0 +1,28 @@
+@page
+@model Identity.Sso.Api.Pages.ConsentModel
+@{
+    ViewData["Title"] = "Autorizar aplicación";
+}
+
+<h1>@Model.ClientDisplayName solicita acceso</h1>
+
+<p class="muted">Se compartirá la siguiente información de su cuenta:</p>
+
+<ul>
+    @foreach (var scope in Model.Scopes)
+    {
+        <li>
+            <strong>@(string.IsNullOrWhiteSpace(scope.DisplayName) ? scope.Name : scope.DisplayName)</strong>
+            @if (!string.IsNullOrWhiteSpace(scope.Description))
+            {
+                <div class="muted">@scope.Description</div>
+            }
+        </li>
+    }
+</ul>
+
+<form method="post">
+    <input type="hidden" asp-for="ReturnUrl" />
+    <button type="submit" asp-page-handler="Accept">Autorizar</button>
+    <button type="submit" asp-page-handler="Deny" class="secondary">Cancelar</button>
+</form>

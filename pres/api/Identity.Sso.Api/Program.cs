@@ -1,11 +1,13 @@
 using DotNetEnv;
+using Identity.Sso.Api.Endpoints;
+using Identity.Sso.Api.Middleware;
 using Identity.Sso.Application;
+using Identity.Sso.Infrastructure;
 using Identity.Sso.Persistence;
-using Identity.Sso.Persistence.Context;
-using Identity.Sso.Persistence.Models;
-using Microsoft.AspNetCore.Identity;
-using OpenIddict.Abstractions;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Scalar.AspNetCore;
+using System.Threading.RateLimiting;
 using static System.Environment;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,96 +41,90 @@ if (builder.Environment.IsDevelopment())
 }
 builder.Configuration.AddEnvironmentVariables();
 
-// 2. Register application and persistence services
 var config = builder.Configuration;
-builder.Services.AddApplicationServices();
-builder.Services.AddPersistenceServices(config).UseAspNetIdentity();
 
-// 3. Add identity services
-builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
-{
-    var passwordPolicySection = config.GetSection("Identity:PasswordPolicy");
-    options.Password.RequireDigit = passwordPolicySection.GetValue<bool>("RequireDigit");
-    options.Password.RequireLowercase = passwordPolicySection.GetValue<bool>("RequireLowercase");
-    options.Password.RequireNonAlphanumeric = passwordPolicySection.GetValue<bool>("RequireNonAlphanumeric");
-    options.Password.RequireUppercase = passwordPolicySection.GetValue<bool>("RequireUppercase");
-    options.Password.RequiredLength = passwordPolicySection.GetValue<int>("RequiredLength");
-    options.Password.RequiredUniqueChars = passwordPolicySection.GetValue<int>("RequiredUniqueChars");
-})
-.AddEntityFrameworkStores<ApplicationDbContext>()
-.AddDefaultTokenProviders();
+// 2. Clean Architecture layers, composed from the inside out.
+builder.Services.AddApplicationServices();
+builder.Services.AddPersistenceServices(config);
+builder.Services.AddInfrastructureServices(config);
+
+// 3. ASP.NET Identity + the OpenIddict server, both owned by the Infrastructure layer.
+builder.Services.AddIdentityServices(config);
+builder.Services.AddOpenIddictServer(config, builder.Environment);
 
 builder.Services.AddAuthorization();
-
-// 3. OpenIddict Core with EF Integration
-var defaultScopes = new[]
+builder.Services.AddRazorPages();
+builder.Services.AddOpenApi(options =>
 {
-    OpenIddictConstants.Scopes.OpenId,
-    OpenIddictConstants.Scopes.Profile,
-    OpenIddictConstants.Scopes.Email,
-    OpenIddictConstants.Scopes.Roles,
-    OpenIddictConstants.Scopes.OfflineAccess
-};
-var customScopes = builder.Configuration
-    .GetSection("OidcConfig:Scopes")
-    .Get<string[]>() ?? [];
-var allScopes = defaultScopes.Concat(customScopes).ToArray();
-
-builder.Services.AddOpenIddict()
-    .AddCore(options =>
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
-        options.UseEntityFrameworkCore().UseDbContext<ApplicationDbContext>();
-    })
-    .AddServer(options =>
-    {
-        // Standard OIDC Endpoint routes
-        options.SetAuthorizationEndpointUris("/connect/authorize")
-                .SetTokenEndpointUris("/connect/token")
-                .SetUserInfoEndpointUris("/connect/userinfo")
-                .SetEndSessionEndpointUris("/connect/logout");
+        document.Info.Title = "SIGOB SSO Identity Provider";
+        document.Info.Version = "v1";
 
-        // Enabled OIDC / OAuth 2.0 Flows
-        options.AllowAuthorizationCodeFlow()
-               .RequireProofKeyForCodeExchange(); // PKCE required for security
+        var documentationPath = Path.Combine(AppContext.BaseDirectory, "API.md");
+        if (File.Exists(documentationPath))
+            document.Info.Description = File.ReadAllText(documentationPath);
 
-        options.AllowRefreshTokenFlow();      // Issuance and renewal with Refresh Tokens
-        options.AllowClientCredentialsFlow(); // Machine-to-Machine (M2M) communication
-
-        // Register supported Scopes
-        options.RegisterScopes(allScopes);
-
-        // Development certificates (For production, replace with persistent X.509 certificates)
-        options.AddDevelopmentEncryptionCertificate()
-                .AddDevelopmentSigningCertificate();
-
-        // Integration with ASP.NET Core and enabling Passthrough
-        options.UseAspNetCore()
-                .EnableAuthorizationEndpointPassthrough()
-                .EnableTokenEndpointPassthrough()
-                .EnableUserInfoEndpointPassthrough()
-                .EnableEndSessionEndpointPassthrough();
-    })
-    .AddValidation(options =>
-    {
-        // Allow validating tokens within the same API if it exposes protected endpoints
-        options.UseLocalServer();
-        options.UseAspNetCore();
+        return Task.CompletedTask;
     });
+});
 
-builder.Services.AddOpenApi();
+// 4. Rate limiting for the credential-facing surface.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("sso-credentials", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+
+// 5. Correct client IP and scheme when running behind the Interop gateway or a reverse proxy.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
+
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
+else
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
 
-app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseRouting();
+app.UseCors(Identity.Sso.Infrastructure.DependencyContainer.SsoCorsPolicy);
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Discovery and JWKS are served by the OpenIddict middleware, so they are not mapped here.
+app.MapHealthProbes();
+app.MapConnectEndpoints().RequireRateLimiting("sso-credentials");
+app.MapRazorPages().RequireRateLimiting("sso-credentials");
+
 app.Run();
+
+// Exposed so the integration test project can host the application through WebApplicationFactory<Program>.
+public partial class Program;

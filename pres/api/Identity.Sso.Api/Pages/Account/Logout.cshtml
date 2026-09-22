@@ -1,0 +1,13 @@
+@page
+@model Identity.Sso.Api.Pages.Account.LogoutModel
+@{
+    ViewData["Title"] = "Cerrar sesión";
+}
+
+<h1>¿Desea cerrar la sesión?</h1>
+
+<p class="muted">Se cerrará su sesión en el proveedor de identidad de SIGOB.</p>
+
+<form method="post" action="@Model.PostTarget">
+    <button type="submit">Cerrar sesión</button>
+</form>

@@ -1,0 +1,28 @@
+@page
+@model Identity.Sso.Api.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Iniciar sesión";
+}
+
+<h1>Iniciar sesión</h1>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <p class="error">@Model.ErrorMessage</p>
+}
+
+<form method="post">
+    <input type="hidden" asp-for="ReturnUrl" />
+
+    <label asp-for="Input.UserName">Usuario o correo</label>
+    <input asp-for="Input.UserName" type="text" autocomplete="username" autofocus />
+
+    <label asp-for="Input.Password">Contraseña</label>
+    <input asp-for="Input.Password" type="password" autocomplete="current-password" />
+
+    <label>
+        <input asp-for="Input.RememberMe" type="checkbox" /> Mantener la sesión iniciada
+    </label>
+
+    <p><button type="submit">Entrar</button></p>
+</form>

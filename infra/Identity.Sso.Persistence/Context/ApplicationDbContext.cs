@@ -36,11 +36,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // 2. Register OpenIddict entities in EF Core model
         builder.UseOpenIddict();
 
-        // ApplicationUserConfig/ApplicationRoleConfig need the current DbContext instance (for CurrentTenantId), so they're excluded from the assembly scan and applied manually.
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly,
-            type => type == typeof(Configuration.ApplicationUserConfig) || type == typeof(Configuration.ApplicationRoleConfig));
-        builder.ApplyConfiguration(new Configuration.ApplicationUserConfig(this));
-        builder.ApplyConfiguration(new Configuration.ApplicationRoleConfig(this));
+            type => type.Namespace == typeof(Configuration.TenantConfig).Namespace);
+
+        // 3. Tenant isolation. Declared here because the filter closes over this context instance:
+        // EF caches the model, so CurrentTenantId must be set before the first query of the process.
+        builder.Entity<ApplicationUser>()
+            .HasQueryFilter(u => CurrentTenantId == null || u.TenantId == CurrentTenantId);
+
+        builder.Entity<ApplicationRole>()
+            .HasQueryFilter(r => CurrentTenantId == null || r.TenantId == null || r.TenantId == CurrentTenantId);
 
         DisableCascadingDelete(builder);
     }
