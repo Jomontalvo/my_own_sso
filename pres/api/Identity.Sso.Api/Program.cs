@@ -42,7 +42,7 @@ builder.Configuration.AddEnvironmentVariables();
 // 2. Register application and persistence services
 var config = builder.Configuration;
 builder.Services.AddApplicationServices();
-builder.Services.AddPersistenceServices(config);
+builder.Services.AddPersistenceServices(config).UseAspNetIdentity();
 
 // 3. Add identity services
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>

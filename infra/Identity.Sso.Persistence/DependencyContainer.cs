@@ -1,5 +1,8 @@
+using Identity.Sso.Application.Interfaces.Persistence;
 using Identity.Sso.Persistence.Context;
 using Identity.Sso.Persistence.Models;
+using Identity.Sso.Persistence.Repositories;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +29,19 @@ public static class DependencyContainer
             options.UseSqlServer(connectionString);
             options.UseOpenIddict();
         });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures the service collection to use ASP.NET Identity, including the UserManager and the Identity repository.
+    /// </summary>
+    /// <param name="services">The service collection to which the ASP.NET Identity services will be added.</param>
+    /// <returns>The updated service collection with the ASP.NET Identity services added.</returns>
+    public static IServiceCollection UseAspNetIdentity(this IServiceCollection services)
+    {
+        services.AddScoped<UserManager<ApplicationUser>>();
+        services.AddScoped<IIdentityRepository, IdentityRepository>();
 
         return services;
     }
