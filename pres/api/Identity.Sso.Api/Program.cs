@@ -61,6 +61,19 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 builder.Services.AddAuthorization();
 
 // 3. OpenIddict Core with EF Integration
+var defaultScopes = new[]
+{
+    OpenIddictConstants.Scopes.OpenId,
+    OpenIddictConstants.Scopes.Profile,
+    OpenIddictConstants.Scopes.Email,
+    OpenIddictConstants.Scopes.Roles,
+    OpenIddictConstants.Scopes.OfflineAccess
+};
+var customScopes = builder.Configuration
+    .GetSection("OidcConfig:Scopes")
+    .Get<string[]>() ?? [];
+var allScopes = defaultScopes.Concat(customScopes).ToArray();
+
 builder.Services.AddOpenIddict()
     .AddCore(options =>
     {
@@ -82,14 +95,7 @@ builder.Services.AddOpenIddict()
         options.AllowClientCredentialsFlow(); // Machine-to-Machine (M2M) communication
 
         // Register supported Scopes
-        options.RegisterScopes(
-            OpenIddictConstants.Scopes.OpenId,
-            OpenIddictConstants.Scopes.Profile,
-            OpenIddictConstants.Scopes.Email,
-            OpenIddictConstants.Scopes.Roles,
-            OpenIddictConstants.Scopes.OfflineAccess,
-            "interop-admin" // Scope personalizado
-        );
+        options.RegisterScopes(allScopes);
 
         // Development certificates (For production, replace with persistent X.509 certificates)
         options.AddDevelopmentEncryptionCertificate()
